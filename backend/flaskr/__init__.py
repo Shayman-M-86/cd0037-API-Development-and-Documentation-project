@@ -1,13 +1,23 @@
-
-
-from flask import Flask, request, abort, jsonify, Response
-from flask_cors import CORS
 import random
 from typing import Optional, cast
-from models import setup_db, Question, Category, db, QuestionValidation
-from .route_helpers import get_pagination , validate_categories, validate_category_id, validate_question_id
+
+from flask import Flask, Response, abort, jsonify, request
+from flask.typing import ResponseReturnValue
+from flask_cors import CORS
+from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.exceptions import HTTPException
+
+from models import Category, Question, QuestionValidation, ValidationError, db, setup_db
+
+from .route_helpers import (
+    get_pagination,
+    validate_categories,
+    validate_category_id,
+    validate_question_id,
+)
 
 QUESTIONS_PER_PAGE = 10
+
 
 def create_app(test_config=None):
     app = Flask(__name__)
@@ -15,7 +25,7 @@ def create_app(test_config=None):
     if test_config is None:
         setup_db(app)
     else:
-        database_path = test_config.get('SQLALCHEMY_DATABASE_URI')
+        database_path = test_config.get("SQLALCHEMY_DATABASE_URI")
         setup_db(app, database_path=database_path)
 
     # @TODO: Set up CORS. Allow '*' for origins.
@@ -27,8 +37,12 @@ def create_app(test_config=None):
     # @TODO: Use the after_request decorator to set Access-Control-Allow
     @app.after_request
     def after_request(response: Response) -> Response:
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,true")
-        response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+        response.headers.add(
+            "Access-Control-Allow-Headers", "Content-Type,Authorization,true"
+        )
+        response.headers.add(
+            "Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+        )
         return response
 
     """
@@ -37,21 +51,18 @@ def create_app(test_config=None):
     for all available categories.
     
     """
-    @app.route('/categories', methods=['GET'])
+
+    @app.route("/categories", methods=["GET"])
     def get_categories():
+        try:
+            categories: list[Category] = Category.query.order_by(Category.id).all()
+        except SQLAlchemyError:
+            abort(500, description="Database error while fetching categories.")
 
-        categories: list[Category] = Category.query.order_by(Category.id).all()
-        categories: list[Category] = validate_categories(categories)
-        
-        categories_dict: dict[int, str] = {category.id: category.type for category in categories}
-        
+        categories = validate_categories(categories)
+        categories_dict: dict[int, str] = {c.id: c.type for c in categories}
 
-
-        return jsonify({
-            'success': True,
-            'categories': categories_dict
-        })
-
+        return jsonify({"success": True, "categories": categories_dict})
 
     """
     @TODO:
@@ -65,41 +76,46 @@ def create_app(test_config=None):
     ten questions per page and pagination at the bottom of the screen for three pages.
     Clicking on the page numbers should update the questions.
     """
-    @app.route('/questions', methods=['GET'])
+
+    @app.route("/questions", methods=["GET"])
     def get_questions():
         page, page_size, offset = get_pagination(request, QUESTIONS_PER_PAGE)
 
-        questions: list[Question] = Question.query.order_by(Question.id).offset(offset).limit(page_size).all()
-        total_questions: int = Question.query.count()
+        try:
+            questions: list[Question] = (
+                Question.query.order_by(Question.id)
+                .offset(offset)
+                .limit(page_size)
+                .all()
+            )
+            total_questions: int = Question.query.count()
+            categories: list[Category] = Category.query.order_by(Category.id).all()
+        except SQLAlchemyError:
+            abort(500, description="Database error while fetching questions.")
 
         if not questions and page != 1:
-            abort(404)
+            abort(404, description="Page out of range.")
 
-        categories: list[Category] = Category.query.order_by(Category.id).all()
-        categories_dict: dict[int, str] = {category.id: category.type for category in categories}
-
+        categories_dict: dict[int, str] = {c.id: c.type for c in categories}
 
         return jsonify(
             {
                 "success": True,
                 "questions": [
                     {
-                        "id": question.id,
-                        "question": question.question,
-                        "answer": question.answer,
-                        "category": question.category,
-                        "difficulty": question.difficulty,
+                        "id": q.id,
+                        "question": q.question,
+                        "answer": q.answer,
+                        "category": q.category,
+                        "difficulty": q.difficulty,
                     }
-                    for question in questions
+                    for q in questions
                 ],
                 "total_questions": total_questions,
                 "categories": categories_dict,
                 "current_category": None,
             }
         )
-    
-    
-    
 
     """
     @TODO:
@@ -108,24 +124,22 @@ def create_app(test_config=None):
     TEST: When you click the trash icon next to a question, the question will be removed.
     This removal will persist in the database and when you refresh the page.
     """
-    @app.route('/questions/<int:question_id>', methods=['DELETE'])
-    def delete_question(question_id: int):
-        id: int = validate_question_id(question_id)
-        question = db.session.get(Question, id)
 
+    @app.route("/questions/<int:question_id>", methods=["DELETE"])
+    def delete_question(question_id: int):
+        qid: int = validate_question_id(question_id)
+
+        question = db.session.get(Question, qid)
         if not question:
-            abort(404, description=f"Question with id {question_id} not found.")
-        question = cast(Question, question)
-        
+            abort(404, description=f"Question with id {qid} not found.")
+
         try:
             question.delete()
-            return jsonify({
-                'success': True,
-                'deleted': question_id
-            })
-        except Exception:
+        except SQLAlchemyError:
             db.session.rollback()
-            abort(422, description=f"Unable to delete question with id {question_id}.")
+            abort(422, description=f"Unable to delete question with id {qid}.")
+
+        return jsonify({"success": True, "deleted": qid})
 
     """
     @TODO:
@@ -137,24 +151,19 @@ def create_app(test_config=None):
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.
     """
-    @app.route('/questions', methods=['POST'])
+
+    @app.route("/questions", methods=["POST"])
     def add_question():
-        body: dict = request.get_json()
-
-        if not body:
+        body = request.get_json(silent=True)
+        if body is None:
             abort(400, description="Request does not contain a valid JSON body.")
-
-        question_text = body.get("question")
-        answer_text = body.get("answer")
-        category = body.get("category")
-        difficulty = body.get("difficulty")
 
         try:
             question_data = QuestionValidation(
-                question=question_text,
-                answer=answer_text,
-                category=category,
-                difficulty=difficulty,
+                question=body.get("question"),
+                answer=body.get("answer"),
+                category=body.get("category"),
+                difficulty=body.get("difficulty"),
             )
 
             new_question = Question(
@@ -165,13 +174,14 @@ def create_app(test_config=None):
             )
             new_question.insert()
 
-            return jsonify({
-                "success": True,
-                "created": new_question.id,
-            })
-        except Exception:
+            return jsonify({"success": True, "created": new_question.id})
+
+        except ValidationError as e:
+            abort(422, description=str(e))
+
+        except SQLAlchemyError:
             db.session.rollback()
-            abort(400, description="Unable to add question.")
+            abort(500, description="Unable to add question, database error.")
 
     """
     @TODO:
@@ -184,6 +194,41 @@ def create_app(test_config=None):
     Try using the word "title" to start.
     """
 
+    @app.route("/questions/search", methods=["POST"])
+    def search_questions():
+        body = request.get_json(silent=True)
+        if body is None:
+            abort(400, description="Request does not contain a valid JSON body.")
+
+        search_term: Optional[str] = body.get("searchTerm")
+        if search_term is None:
+            abort(400, description="searchTerm is required in the request body.")
+
+        search_term = search_term.strip()
+        if not search_term:
+            abort(400, description="searchTerm cannot be empty or whitespace.")
+
+        try:
+            questions: list[Question] = (
+                db.session.query(Question)
+                .filter(Question.question.ilike(f"%{search_term}%"))
+                .all()
+            )
+        except SQLAlchemyError:
+            abort(
+                500,
+                description="Database error occurred while searching for questions.",
+            )
+
+        return jsonify(
+            {
+                "success": True,
+                "questions": [q.format() for q in questions],
+                "total_questions": len(questions),
+                "current_category": None,
+            }
+        )
+
     """
     @TODO:
     Create a GET endpoint to get questions based on category.
@@ -192,6 +237,34 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
+
+    @app.route("/categories/<int:category_id>/questions", methods=["GET"])
+    def get_questions_by_category(category_id: int):
+        cid = validate_category_id(category_id)
+
+        try:
+            category = db.session.get(Category, cid)
+        except SQLAlchemyError:
+            abort(500, description="Database error while fetching category.")
+
+        if not category:
+            abort(404, description=f"Category with id {cid} not found.")
+
+        try:
+            questions: list[Question] = (
+                db.session.query(Question).filter_by(category=cid).all()
+            )
+        except SQLAlchemyError:
+            abort(500, description="Database error while fetching category questions.")
+
+        return jsonify(
+            {
+                "success": True,
+                "questions": [q.format() for q in questions],
+                "total_questions": len(questions),
+                "current_category": cid,
+            }
+        )
 
     """
     @TODO:
@@ -205,11 +278,86 @@ def create_app(test_config=None):
     and shown whether they were correct or not.
     """
 
+    @app.route("/quizzes", methods=["POST"])
+    def play_quiz():
+        body = request.get_json(silent=True)
+        if body is None:
+            abort(400, description="Request does not contain a valid JSON body.")
+
+        previous_questions = body.get("previous_questions", [])
+        quiz_category = body.get("quiz_category", "0")
+
+        if not isinstance(previous_questions, list) or any(
+            not isinstance(x, int) for x in previous_questions
+        ):
+            abort(400, description="previous_questions must be a list of integers.")
+
+        query = Question.query
+
+        if quiz_category not in ("0", 0, "All", None, ""):
+            try:
+                category_id = int(quiz_category)
+            except (TypeError, ValueError):
+                abort(
+                    400,
+                    description="quiz_category must be a category id (string/int) or '0' for All.",
+                )
+
+            try:
+                if not db.session.get(Category, category_id):
+                    abort(404, description=f"Category with id {category_id} not found.")
+            except SQLAlchemyError:
+                abort(500, description="Database error while validating category.")
+
+            query = query.filter(Question.category == category_id)
+
+        if previous_questions:
+            query = query.filter(~Question.id.in_(previous_questions))
+
+        try:
+            available = query.all()
+        except SQLAlchemyError:
+            abort(500, description="Database error while fetching quiz questions.")
+
+        if not available:
+            return jsonify({"question": None}), 200
+
+        question = random.choice(available)
+        return jsonify({"question": question.format()}), 200
+
     """
     @TODO:
     Create error handlers for all expected errors
     including 404 and 422.
     """
 
-    return app
+    """
+    Global Error Handler 
+    """
 
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(err: HTTPException) -> ResponseReturnValue:
+        status_code = cast(int, err.code or 500)
+
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": status_code,
+                    "message": err.description if err.description else err.name,
+                }
+            ),
+            status_code,
+        )
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_exception(_err: Exception):
+        return jsonify(
+            {
+                "success": False,
+                "error": 500,
+                "message": "Internal server error",
+            }
+        ), 500
+
+    return app
