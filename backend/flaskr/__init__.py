@@ -1,9 +1,11 @@
+
+
 from flask import Flask, request, abort, jsonify, Response
 from flask_cors import CORS
 import random
-
-from models import setup_db, Question, Category, db
-from .route_helpers import get_pagination
+from typing import Optional, cast
+from models import setup_db, Question, Category, db, QuestionValidation
+from .route_helpers import get_pagination , validate_categories, validate_category_id, validate_question_id
 
 QUESTIONS_PER_PAGE = 10
 
@@ -39,12 +41,11 @@ def create_app(test_config=None):
     def get_categories():
 
         categories: list[Category] = Category.query.order_by(Category.id).all()
-        if not categories:
-            abort(404)
-
-        categories_dict = {category.id: category.type for category in categories}
+        categories: list[Category] = validate_categories(categories)
         
-        formatted_categories = [category.format() for category in categories]
+        categories_dict: dict[int, str] = {category.id: category.type for category in categories}
+        
+
 
         return jsonify({
             'success': True,
@@ -69,23 +70,33 @@ def create_app(test_config=None):
         page, page_size, offset = get_pagination(request, QUESTIONS_PER_PAGE)
 
         questions: list[Question] = Question.query.order_by(Question.id).offset(offset).limit(page_size).all()
-        total_questions = Question.query.count()
+        total_questions: int = Question.query.count()
 
         if not questions and page != 1:
             abort(404)
 
         categories: list[Category] = Category.query.order_by(Category.id).all()
-        categories_dict = {category.id: category.type for category in categories}
+        categories_dict: dict[int, str] = {category.id: category.type for category in categories}
 
-        formatted_questions = [question.format() for question in questions]
 
-        return jsonify({
-            'success': True,
-            'questions': formatted_questions,
-            'total_questions': total_questions,
-            'categories': categories_dict,
-            'current_category': None
-        })
+        return jsonify(
+            {
+                "success": True,
+                "questions": [
+                    {
+                        "id": question.id,
+                        "question": question.question,
+                        "answer": question.answer,
+                        "category": question.category,
+                        "difficulty": question.difficulty,
+                    }
+                    for question in questions
+                ],
+                "total_questions": total_questions,
+                "categories": categories_dict,
+                "current_category": None,
+            }
+        )
     
     
     
@@ -97,6 +108,24 @@ def create_app(test_config=None):
     TEST: When you click the trash icon next to a question, the question will be removed.
     This removal will persist in the database and when you refresh the page.
     """
+    @app.route('/questions/<int:question_id>', methods=['DELETE'])
+    def delete_question(question_id: int):
+        id: int = validate_question_id(question_id)
+        question = db.session.get(Question, id)
+
+        if not question:
+            abort(404, description=f"Question with id {question_id} not found.")
+        question = cast(Question, question)
+        
+        try:
+            question.delete()
+            return jsonify({
+                'success': True,
+                'deleted': question_id
+            })
+        except Exception:
+            db.session.rollback()
+            abort(422, description=f"Unable to delete question with id {question_id}.")
 
     """
     @TODO:
@@ -108,6 +137,41 @@ def create_app(test_config=None):
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.
     """
+    @app.route('/questions', methods=['POST'])
+    def add_question():
+        body: dict = request.get_json()
+
+        if not body:
+            abort(400, description="Request does not contain a valid JSON body.")
+
+        question_text = body.get("question")
+        answer_text = body.get("answer")
+        category = body.get("category")
+        difficulty = body.get("difficulty")
+
+        try:
+            question_data = QuestionValidation(
+                question=question_text,
+                answer=answer_text,
+                category=category,
+                difficulty=difficulty,
+            )
+
+            new_question = Question(
+                question=question_data.question,
+                answer=question_data.answer,
+                category=question_data.category,
+                difficulty=question_data.difficulty,
+            )
+            new_question.insert()
+
+            return jsonify({
+                "success": True,
+                "created": new_question.id,
+            })
+        except Exception:
+            db.session.rollback()
+            abort(400, description="Unable to add question.")
 
     """
     @TODO:
