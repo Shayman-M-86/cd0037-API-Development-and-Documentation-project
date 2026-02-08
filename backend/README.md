@@ -104,48 +104,11 @@ export FLASK_ENV=development
 flask run --reload
 ```
 
-## Project Notes
-
-These are the files you'd want to edit in the backend:
-
-1. `backend/flaskr/__init__.py`
-2. `backend/test_flaskr.py`
-
-One note before you delve into your tasks: for each endpoint, you are expected to define the endpoint and response data. The frontend will be a plentiful resource because it is set up to expect certain endpoints and response data formats already. You should feel free to specify endpoints in your own way; if you do so, make sure to update the frontend or you will get some unexpected behavior.
-
-1. Use Flask-CORS to enable cross-domain requests and set response headers.
-2. Create an endpoint to handle `GET` requests for questions, including pagination (every 10 questions). This endpoint should return a list of questions, number of total questions, current category, categories.
-3. Create an endpoint to handle `GET` requests for all available categories.
-4. Create an endpoint to `DELETE` a question using a question `ID`.
-5. Create an endpoint to `POST` a new question, which will require the question and answer text, category, and difficulty score.
-6. Create an endpoint to `PUT` updates to an existing question.
-7. Create a `POST` endpoint to get questions based on category.
-8. Create a `POST` endpoint to get questions based on a search term. It should return any questions for whom the search term is a substring of the question.
-9. Create a `POST` endpoint to get questions to play the quiz. This endpoint should take a category and previous question parameters and return a random questions within the given category, if provided, and that is not one of the previous questions.
-10. Create error handlers for all expected errors including 400, 404, 422, and 500.
-
 ## API Documentation
 
-Detailed endpoint documentation is included below and in `API_DOCUMENTATION.md`. Each entry includes the METHOD, URL, request parameters, and response body.
+Trivia App API Overview
 
-### Documentation Example
-
-`GET '/categories'`
-
-- Fetches a dictionary of categories in which the keys are the ids and the value is the corresponding string of the category
-- Request Arguments: None
-- Returns: An object with a single key, `categories`, that contains an object of `id: category_string` key: value pairs.
-
-```json
-{
-  "1": "Science",
-  "2": "Art",
-  "3": "Geography",
-  "4": "History",
-  "5": "Entertainment",
-  "6": "Sports"
-}
-```
+This project delivers a RESTful API for a full-stack Trivia application that enables users to view, create, delete, search, and play trivia questions. Built with Flask and SQLAlchemy, the API supports retrieving questions globally or by category, adding and deleting questions, searching via text queries, and running a quiz mode that serves randomized questions across all categories or within a selected category. The API is designed to integrate seamlessly with a React frontend, emphasizing clean endpoint design, predictable response formats, and thorough testing—core skills for building production-ready backend services.
 
 ### API Endpoints
 
