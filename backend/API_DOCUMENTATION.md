@@ -98,6 +98,27 @@
 }
 ```
 
+`PUT '/questions/<int:question_id>'`
+
+- Updates an existing question by id.
+- Request Arguments: `question_id` (path param, required)
+- Request Body (JSON): any of `question` (string), `answer` (string), `category` (int), `difficulty` (int 1-5)
+- Returns: `success`, `updated` (id), `question` (updated question)
+
+```json
+{
+  "success": true,
+  "updated": 24,
+  "question": {
+    "id": 24,
+    "question": "Updated question?",
+    "answer": "Updated answer",
+    "category": 1,
+    "difficulty": 3
+  }
+}
+```
+
 `POST '/questions/search'`
 
 - Searches for questions that contain the given search term (case-insensitive).

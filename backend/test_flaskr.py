@@ -1,5 +1,6 @@
 import logging
 import unittest
+from typing import Optional
 
 from sqlalchemy import text
 
@@ -43,8 +44,8 @@ class TriviaTestCase(unittest.TestCase):
             db.session.commit()
 
     """
-    TODO
-    Write at least one test for each test for successful operation and for expected errors.
+    Write at least one test for each endpoint for successful operation
+    and for expected errors.
     """
 
     def test_cors_headers_are_present_on_get(self):
@@ -94,6 +95,14 @@ class TriviaTestCase(unittest.TestCase):
                     self.assertIsInstance(question, dict)
                     self.assertEqual(set(question.keys()), EXPECTED_KEYS)
 
+    def test_get_questions_invalid_page(self):
+        res = self.client.get("/questions", query_string={"page": 0})
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(data["success"])
+        self.assertIn("page must be >= 1", data["message"])
+
     def test_delete_question(self):
         with self.app.app_context():
             category = Category(type="Test Category")
@@ -128,6 +137,14 @@ class TriviaTestCase(unittest.TestCase):
         ids = [q["id"] for q in data["questions"]]
         self.assertNotIn(question_id, ids)
 
+    def test_delete_question_not_found(self):
+        res = self.client.delete("/questions/999999")
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 404)
+        self.assertFalse(data["success"])
+        self.assertIn("not found", data["message"].lower())
+
     def test_questions_post(self):
         new_question = {
             "question": "What is the capital of France?",
@@ -152,6 +169,14 @@ class TriviaTestCase(unittest.TestCase):
             self.assertEqual(question.answer, new_question["answer"])
             self.assertEqual(question.category, new_question["category"])
             self.assertEqual(question.difficulty, new_question["difficulty"])
+
+    def test_questions_post_missing_body(self):
+        res = self.client.post("/questions")
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(data["success"])
+        self.assertIn("valid JSON body", data["message"])
 
     def test_questions_post_invalid_data(self):
         invalid_question = {
@@ -182,6 +207,14 @@ class TriviaTestCase(unittest.TestCase):
         for question in data["questions"]:
             self.assertIn("title", question["question"].lower())
 
+    def test_search_questions_missing_term(self):
+        res = self.client.post("/questions/search", json={})
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(data["success"])
+        self.assertIn("searchterm is required", data["message"].lower())
+
     def test_get_questions_by_category(self):
         category_id = 1
 
@@ -195,6 +228,14 @@ class TriviaTestCase(unittest.TestCase):
 
         for q in data["questions"]:
             self.assertEqual(q["category"], category_id)
+
+    def test_get_questions_by_category_not_found(self):
+        res = self.client.get("/categories/999999/questions")
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 404)
+        self.assertFalse(data["success"])
+        self.assertIn("not found", data["message"].lower())
 
     def test_quizzes_returns_question(self):
         payload = {
@@ -215,6 +256,14 @@ class TriviaTestCase(unittest.TestCase):
         self.assertIn("answer", q)
         self.assertIn("difficulty", q)
         self.assertIn("category", q)
+
+    def test_quizzes_invalid_payload(self):
+        res = self.client.post("/quizzes", json={"previous_questions": "bad"})
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(data["success"])
+        self.assertIn("quiz_category", data["message"])
 
     def test_quizzes_excludes_previous_questions(self):
         previous = [1, 4, 20, 15]
@@ -238,6 +287,88 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertTrue(data["question"])
         self.assertEqual(str(data["question"]["category"]), category_id)
+
+    def test_update_question_put(self):
+        with self.app.app_context():
+            category = Category(type="Update Category")
+            db.session.add(category)
+            db.session.commit()
+
+            question = Question(
+                question="Old question?",
+                answer="Old answer",
+                category=category.id,
+                difficulty=1,
+            )
+            db.session.add(question)
+            db.session.commit()
+
+            question_id = question.id
+
+        payload = {
+            "question": "New question?",
+            "answer": "New answer",
+            "difficulty": 3,
+        }
+
+        res = self.client.put(f"/questions/{question_id}", json=payload)
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(data["success"])
+        self.assertEqual(data["updated"], question_id)
+        self.assertEqual(data["question"]["question"], payload["question"])
+        self.assertEqual(data["question"]["answer"], payload["answer"])
+        self.assertEqual(data["question"]["difficulty"], payload["difficulty"])
+
+        with self.app.app_context():
+            updated_question: Optional[Question] = db.session.get(Question, question_id)
+            if updated_question is None:
+                self.fail("Updated question not found in database.")
+            self.assertEqual(updated_question.question, payload["question"])
+            self.assertEqual(updated_question.answer, payload["answer"])
+            self.assertEqual(updated_question.difficulty, payload["difficulty"])
+
+    def test_update_question_put_invalid_data(self):
+        with self.app.app_context():
+            category = Category(type="Update Category 2")
+            db.session.add(category)
+            db.session.commit()
+
+            question = Question(
+                question="Old question?",
+                answer="Old answer",
+                category=category.id,
+                difficulty=1,
+            )
+            db.session.add(question)
+            db.session.commit()
+
+            question_id = question.id
+
+        payload = {"difficulty": 999}
+        res = self.client.put(f"/questions/{question_id}", json=payload)
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 422)
+        self.assertFalse(data["success"])
+        self.assertIn("difficulty must be an integer between 1 and 5", data["message"])
+
+    def test_update_question_put_missing_body(self):
+        res = self.client.put("/questions/1")
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(data["success"])
+        self.assertIn("valid JSON body", data["message"])
+
+    def test_update_question_put_not_found(self):
+        res = self.client.put("/questions/999999", json={"question": "Nope"})
+        data = res.get_json()
+
+        self.assertEqual(res.status_code, 404)
+        self.assertFalse(data["success"])
+        self.assertIn("not found", data["message"].lower())
 
 
 if __name__ == "__main__":

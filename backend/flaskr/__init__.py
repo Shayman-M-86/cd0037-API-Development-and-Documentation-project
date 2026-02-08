@@ -1,7 +1,7 @@
 import random
 from typing import Optional, cast
 
-from flask import Flask, Response, abort, jsonify, request
+from flask import Flask, Request, Response, abort, jsonify, request
 from flask.typing import ResponseReturnValue
 from flask_cors import CORS
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,12 +16,6 @@ from models import (
     setup_db,
 )
 
-from .route_helpers import (
-    get_pagination,
-    validate_category_id,
-    validate_question_id,
-)
-
 QUESTIONS_PER_PAGE = 10
 
 
@@ -34,13 +28,40 @@ def create_app(test_config=None):
         database_path = test_config.get("SQLALCHEMY_DATABASE_URI")
         setup_db(app, database_path=database_path)
 
-    # @TODO: Set up CORS. Allow '*' for origins.
+    # Enable CORS for all origins.
     CORS(app, resources={r"/*": {"origins": "*"}})
 
     with app.app_context():
         db.create_all()
 
-    # @TODO: Use the after_request decorator to set Access-Control-Allow
+    """
+    Helpers
+    """
+
+    def get_pagination(request: Request, PAGE_SIZE=10) -> tuple[int, int, int]:
+        try:
+            page = int(request.args.get("page", 1))
+        except ValueError:
+            abort(400, description="page must be an integer")
+
+        if page < 1:
+            abort(400, description="page must be >= 1")
+
+        offset = (page - 1) * PAGE_SIZE
+        return page, PAGE_SIZE, offset
+
+    def validate_category_id(category_id: int) -> int:
+        if not isinstance(category_id, int) or category_id < 1:
+            abort(400, description="category_id must be a positive integer")
+        return category_id
+
+    def validate_question_id(question_id: int) -> int:
+        if not question_id:
+            abort(400, description="question_id is required")
+        if not isinstance(question_id, int) or question_id < 1:
+            abort(400, description="question_id must be a positive integer")
+        return question_id
+
     @app.after_request
     def after_request(response: Response) -> Response:
         response.headers.add(
@@ -52,10 +73,8 @@ def create_app(test_config=None):
         return response
 
     """
-    @TODO:
     Create an endpoint to handle GET requests
     for all available categories.
-    
     """
 
     @app.route("/categories", methods=["GET"])
@@ -72,7 +91,6 @@ def create_app(test_config=None):
         return jsonify({"success": True, "categories": categories_dict})
 
     """
-    @TODO:
     Create an endpoint to handle GET requests for questions,
     including pagination (every 10 questions).
     This endpoint should return a list of questions,
@@ -122,7 +140,6 @@ def create_app(test_config=None):
         )
 
     """
-    @TODO:
     Create an endpoint to DELETE question using a question ID.
 
     TEST: When you click the trash icon next to a question, the question will be removed.
@@ -146,7 +163,6 @@ def create_app(test_config=None):
         return jsonify({"success": True, "deleted": qid})
 
     """
-    @TODO:
     Create an endpoint to POST a new question,
     which will require the question and answer text,
     category, and difficulty score.
@@ -188,7 +204,6 @@ def create_app(test_config=None):
             abort(500, description="Unable to add question, database error.")
 
     """
-    @TODO:
     Create a POST endpoint to get questions based on a search term.
     It should return any questions for whom the search term
     is a substring of the question.
@@ -200,7 +215,6 @@ def create_app(test_config=None):
 
     @app.route("/questions/search", methods=["POST"])
     def search_questions():
-        # todo fix search
         body = request.get_json(silent=True)
         if body is None:
             abort(400, description="Request does not contain a valid JSON body.")
@@ -235,7 +249,6 @@ def create_app(test_config=None):
         )
 
     """
-    @TODO:
     Create a GET endpoint to get questions based on category.
 
     TEST: In the "List" tab / main screen, clicking on one of the
@@ -272,7 +285,6 @@ def create_app(test_config=None):
         )
 
     """
-    @TODO:
     Create a POST endpoint to get questions to play the quiz.
     This endpoint should take category and previous question parameters
     and return a random questions within the given category,
@@ -289,13 +301,16 @@ def create_app(test_config=None):
         if body is None:
             abort(400, description="Request does not contain a valid JSON body.")
 
-        quiz_category = body.get("quiz_category", None)
-        if (
-            not isinstance(quiz_category, dict)
-            or "id" not in quiz_category
-            or "type" not in quiz_category
-        ):
-            abort(400, description="quiz_category must have 'id' and 'type' field.")
+        quiz_category: Optional[dict] = body.get("quiz_category", None)
+        if isinstance(quiz_category, dict):
+            if "id" not in quiz_category:
+                abort(400, description="quiz_category must include an 'id' field.")
+            category_id_raw = quiz_category.get("id")
+        elif isinstance(quiz_category, (str, int)):
+            category_id_raw: Optional[int] = quiz_category
+
+        else:
+            abort(400, description="quiz_category must be a category id or object.")
 
         previous_questions = body.get("previous_questions", [])
         if not isinstance(previous_questions, list) or any(
@@ -303,17 +318,16 @@ def create_app(test_config=None):
         ):
             abort(400, description="previous_questions must be a list of integers.")
 
+        try:
+            category_id = int(category_id_raw) if category_id_raw is not None else 0
+        except (TypeError, ValueError):
+            abort(
+                400,
+                description="quiz_category must be a category id (string/int) or '0' for All.",
+            )
+
         query = Question.query
-
-        if quiz_category in ("0", 0, "All", None, ""):
-            try:
-                category_id = int(quiz_category["id"])
-            except (TypeError, ValueError):
-                abort(
-                    400,
-                    description="quiz_category must be a category id (string/int) or '0' for All.",
-                )
-
+        if category_id != 0:
             try:
                 if not db.session.get(Category, category_id):
                     abort(404, description=f"Category with id {category_id} not found.")
@@ -337,7 +351,52 @@ def create_app(test_config=None):
         return jsonify({"question": question.format()}), 200
 
     """
-    @TODO:
+    Create a PUT endpoint to update a question.
+    """
+
+    @app.route("/questions/<int:question_id>", methods=["PUT"])
+    def update_question(question_id: int):
+        qid = validate_question_id(question_id)
+        body = request.get_json(silent=True)
+        if body is None:
+            abort(400, description="Request does not contain a valid JSON body.")
+
+        question = db.session.get(Question, qid)
+        if not question:
+            abort(404, description=f"Question with id {qid} not found.")
+
+        updatable_fields = {"question", "answer", "category", "difficulty"}
+        if not any(field in body for field in updatable_fields):
+            abort(400, description="At least one updatable field is required.")
+
+        try:
+            if "question" in body:
+                question.question = QuestionCreationValidation.validate_question(
+                    body.get("question")
+                )
+            if "answer" in body:
+                question.answer = QuestionCreationValidation.validate_answer(
+                    body.get("answer")
+                )
+            if "category" in body:
+                question.category = QuestionCreationValidation.validate_category(
+                    body.get("category")
+                )
+            if "difficulty" in body:
+                question.difficulty = QuestionCreationValidation.validate_difficulty(
+                    body.get("difficulty")
+                )
+
+            question.update()
+        except ValidationError as e:
+            abort(422, description=str(e))
+        except SQLAlchemyError:
+            db.session.rollback()
+            abort(500, description=f"Unable to update question with id {qid}.")
+
+        return jsonify({"success": True, "updated": qid, "question": question.format()})
+
+    """
     Create error handlers for all expected errors
     including 404 and 422.
     """

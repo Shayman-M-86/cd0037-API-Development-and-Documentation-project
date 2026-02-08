@@ -127,15 +127,17 @@ class QuestionCreationValidation:
             raise ValidationError(
                 "category must be a positive integer", status_code=422
             ) from None
-            
+
         if not isinstance(category_id, int) or category_id < 1:
-            raise ValidationError("category must be a positive integer", status_code=422) from None
-        
+            raise ValidationError(
+                "category must be a positive integer", status_code=422
+            ) from None
+
         if not db.session.get(Category, category_id):
             raise ValidationError(
                 f"Category with id {category_id} does not exist", status_code=422
             ) from None
-            
+
         return category_id
 
     @staticmethod

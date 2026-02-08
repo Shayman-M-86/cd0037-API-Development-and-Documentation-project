@@ -118,10 +118,11 @@ One note before you delve into your tasks: for each endpoint, you are expected t
 3. Create an endpoint to handle `GET` requests for all available categories.
 4. Create an endpoint to `DELETE` a question using a question `ID`.
 5. Create an endpoint to `POST` a new question, which will require the question and answer text, category, and difficulty score.
-6. Create a `POST` endpoint to get questions based on category.
-7. Create a `POST` endpoint to get questions based on a search term. It should return any questions for whom the search term is a substring of the question.
-8. Create a `POST` endpoint to get questions to play the quiz. This endpoint should take a category and previous question parameters and return a random questions within the given category, if provided, and that is not one of the previous questions.
-9. Create error handlers for all expected errors including 400, 404, 422, and 500.
+6. Create an endpoint to `PUT` updates to an existing question.
+7. Create a `POST` endpoint to get questions based on category.
+8. Create a `POST` endpoint to get questions based on a search term. It should return any questions for whom the search term is a substring of the question.
+9. Create a `POST` endpoint to get questions to play the quiz. This endpoint should take a category and previous question parameters and return a random questions within the given category, if provided, and that is not one of the previous questions.
+10. Create error handlers for all expected errors including 400, 404, 422, and 500.
 
 ## API Documentation
 
@@ -238,6 +239,37 @@ Detailed endpoint documentation is included below and in `API_DOCUMENTATION.md`.
 {
   "success": true,
   "created": 24
+}
+```
+
+---
+
+#### `PUT '/questions/<int:question_id>'`
+
+- Updates an existing question by id.
+- Request Arguments: `question_id` (path param, required)
+- Request Body (JSON): any of `question` (string), `answer` (string), `category` (int), `difficulty` (int 1-5)
+- Returns: `success`, `updated` (id), `question` (updated question)
+
+```json
+{
+  "question": "Updated question?",
+  "answer": "Updated answer",
+  "difficulty": 3
+}
+```
+
+```json
+{
+  "success": true,
+  "updated": 24,
+  "question": {
+    "id": 24,
+    "question": "Updated question?",
+    "answer": "Updated answer",
+    "category": 1,
+    "difficulty": 3
+  }
 }
 ```
 
