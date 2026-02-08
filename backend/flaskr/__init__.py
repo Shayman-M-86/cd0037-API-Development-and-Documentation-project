@@ -7,11 +7,17 @@ from flask_cors import CORS
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
-from models import Category, Question, QuestionValidation, ValidationError, db, setup_db
+from models import (
+    Category,
+    Question,
+    QuestionCreationValidation,
+    ValidationError,
+    db,
+    setup_db,
+)
 
 from .route_helpers import (
     get_pagination,
-    validate_categories,
     validate_category_id,
     validate_question_id,
 )
@@ -55,11 +61,12 @@ def create_app(test_config=None):
     @app.route("/categories", methods=["GET"])
     def get_categories():
         try:
-            categories: list[Category] = Category.query.order_by(Category.id).all()
+            categories: list[Category] = (
+                db.session.query(Category).order_by(Category.id).all()
+            )
         except SQLAlchemyError:
             abort(500, description="Database error while fetching categories.")
 
-        categories = validate_categories(categories)
         categories_dict: dict[int, str] = {c.id: c.type for c in categories}
 
         return jsonify({"success": True, "categories": categories_dict})
@@ -92,9 +99,6 @@ def create_app(test_config=None):
             categories: list[Category] = Category.query.order_by(Category.id).all()
         except SQLAlchemyError:
             abort(500, description="Database error while fetching questions.")
-
-        if not questions and page != 1:
-            abort(404, description="Page out of range.")
 
         categories_dict: dict[int, str] = {c.id: c.type for c in categories}
 
@@ -159,7 +163,7 @@ def create_app(test_config=None):
             abort(400, description="Request does not contain a valid JSON body.")
 
         try:
-            question_data = QuestionValidation(
+            question_data = QuestionCreationValidation(
                 question=body.get("question"),
                 answer=body.get("answer"),
                 category=body.get("category"),
@@ -196,6 +200,7 @@ def create_app(test_config=None):
 
     @app.route("/questions/search", methods=["POST"])
     def search_questions():
+        # todo fix search
         body = request.get_json(silent=True)
         if body is None:
             abort(400, description="Request does not contain a valid JSON body.")
@@ -206,7 +211,7 @@ def create_app(test_config=None):
 
         search_term = search_term.strip()
         if not search_term:
-            abort(400, description="searchTerm cannot be empty or whitespace.")
+            abort(400, description="searchTerm cannot be empty.")
 
         try:
             questions: list[Question] = (
@@ -284,9 +289,15 @@ def create_app(test_config=None):
         if body is None:
             abort(400, description="Request does not contain a valid JSON body.")
 
-        previous_questions = body.get("previous_questions", [])
-        quiz_category = body.get("quiz_category", "0")
+        quiz_category = body.get("quiz_category", None)
+        if (
+            not isinstance(quiz_category, dict)
+            or "id" not in quiz_category
+            or "type" not in quiz_category
+        ):
+            abort(400, description="quiz_category must have 'id' and 'type' field.")
 
+        previous_questions = body.get("previous_questions", [])
         if not isinstance(previous_questions, list) or any(
             not isinstance(x, int) for x in previous_questions
         ):
@@ -294,9 +305,9 @@ def create_app(test_config=None):
 
         query = Question.query
 
-        if quiz_category not in ("0", 0, "All", None, ""):
+        if quiz_category in ("0", 0, "All", None, ""):
             try:
-                category_id = int(quiz_category)
+                category_id = int(quiz_category["id"])
             except (TypeError, ValueError):
                 abort(
                     400,

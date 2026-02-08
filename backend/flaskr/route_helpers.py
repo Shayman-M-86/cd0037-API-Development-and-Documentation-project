@@ -1,6 +1,5 @@
 from flask import Request, abort
 
-from models import Category
 
 
 def get_pagination(request: Request, PAGE_SIZE=10) -> tuple[int, int, int]:
@@ -13,15 +12,6 @@ def get_pagination(request: Request, PAGE_SIZE=10) -> tuple[int, int, int]:
     return page, PAGE_SIZE, offset
 
 
-def validate_categories(categories) -> list[Category]:
-    if not isinstance(categories, list):
-        abort(400, description="categories is not a list")
-
-    for category in categories:
-        if not isinstance(category.id, int) or not isinstance(category.type, str):
-            abort(400, description="category id must be int and type must be str")
-
-    return categories
 
 
 def validate_category_id(category_id: int) -> int:

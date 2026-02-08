@@ -1,28 +1,88 @@
 # Backend - Trivia API
 
-## Setting up the Backend
+## Requirements
 
-### Install Dependencies
+- Python 3.9.25
+- Postgres
 
-1. **Python 3.7** - Follow instructions to install the latest version of python for your platform in the [python docs](https://docs.python.org/3/using/unix.html#getting-and-installing-the-latest-version-of-python)
+## Environment Variables
 
-2. **Virtual Environment** - We recommend working within a virtual environment whenever using Python for projects. This keeps your dependencies for each project separate and organized. Instructions for setting up a virual environment for your platform can be found in the [python docs](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/)
+Secrets are loaded from environment variables via `python-dotenv`. Create a `.env` file (see `.env.example`) with the following values:
 
-3. **PIP Dependencies** - Once your virtual environment is setup and running, install the required dependencies by navigating to the `/backend` directory and running:
+- `DATABASE_URL` (production DB)
+- `SECRET_KEY`
+- `TEST_DATABASE_URL` (must include the word `test`)
+- `TEST_SECRET_KEY`
+
+---
+
+## Install Dependencies
+
+This project requires Python 3.9.25 for compatibility.
+
+### UV Guide
+
+1. Install Python 3.9.25.
+2. `cd` into the backend project directory.
+3. Create and activate a virtual environment.
+
+    ```bash
+    uv venv .venv
+    ```
+
+4. Activate the virtual environment:
+
+    - On Windows:
+
+        ```bash
+        source .venv\Scripts\activate
+        ```
+
+    - On Unix or MacOS:
+
+        ```bash
+        source .venv/bin/activate
+        ```
+
+5. Install dependencies with UV:
+
+    ```bash
+    uv sync
+    ```
+
+### Pip Guide
+
+1. Install Python 3.9.25.
+2. `cd` into the backend project directory.
+3. Create a virtual environment:
+
+    ```bash
+    python -m venv .venv
+    ```
+
+4. Activate the virtual environment:
+
+    - On Windows:
+
+        ```bash
+        source .venv\Scripts\activate
+        ```
+
+    - On Unix or MacOS:
+
+        ```bash
+        source .venv/bin/activate
+        ```
+
+5. Install dependencies with pip:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-#### Key Pip Dependencies
+---
 
-- [Flask](http://flask.pocoo.org/) is a lightweight backend microservices framework. Flask is required to handle requests and responses.
-
-- [SQLAlchemy](https://www.sqlalchemy.org/) is the Python SQL toolkit and ORM we'll use to handle the lightweight SQL database. You'll primarily work in `app.py`and can reference `models.py`.
-
-- [Flask-CORS](https://flask-cors.readthedocs.io/en/latest/#) is the extension we'll use to handle cross-origin requests from our frontend server.
-
-### Set up the Database
+## Set up the Database
 
 With Postgres running, create a `trivia` database:
 
@@ -30,25 +90,21 @@ With Postgres running, create a `trivia` database:
 createdb trivia
 ```
 
-Populate the database using the `trivia.psql` file provided. From the `backend` folder in terminal run:
+Populate the database using the `trivia.psql` file provided:
 
 ```bash
 psql trivia < trivia.psql
 ```
 
-### Run the Server
-
-From within the `./src` directory first ensure you are working using your created virtual environment.
-
-To run the server, execute:
+## Run the Server
 
 ```bash
+export FLASK_APP=flaskr
+export FLASK_ENV=development
 flask run --reload
 ```
 
-The `--reload` flag will detect file changes and restart the server automatically.
-
-## To Do Tasks
+## Project Notes
 
 These are the files you'd want to edit in the backend:
 
@@ -67,13 +123,13 @@ One note before you delve into your tasks: for each endpoint, you are expected t
 8. Create a `POST` endpoint to get questions to play the quiz. This endpoint should take a category and previous question parameters and return a random questions within the given category, if provided, and that is not one of the previous questions.
 9. Create error handlers for all expected errors including 400, 404, 422, and 500.
 
-## Documenting your Endpoints
+## API Documentation
 
-You will need to provide detailed documentation of your API endpoints including the URL, request parameters, and the response body. Use the example below as a reference.
+Detailed endpoint documentation is included below and in `API_DOCUMENTATION.md`. Each entry includes the METHOD, URL, request parameters, and response body.
 
 ### Documentation Example
 
-`GET '/api/v1.0/categories'`
+`GET '/categories'`
 
 - Fetches a dictionary of categories in which the keys are the ids and the value is the corresponding string of the category
 - Request Arguments: None
@@ -89,6 +145,211 @@ You will need to provide detailed documentation of your API endpoints including 
   "6": "Sports"
 }
 ```
+
+### API Endpoints
+
+#### `GET '/categories'`
+
+- Fetches a dictionary of all categories.
+- Request Arguments: None
+- Returns: `success`, `categories` where `categories` is an object of `id: category_string` pairs.
+
+```json
+{
+  "success": true,
+  "categories": {
+    "1": "Science",
+    "2": "Art",
+    "3": "Geography",
+    "4": "History",
+    "5": "Entertainment",
+    "6": "Sports"
+  }
+}
+```
+
+---
+
+#### `GET '/questions'`
+
+- Fetches a paginated list of questions (10 per page), categories, and total question count.
+- Request Arguments (Query Params): `page` (optional, int, default `1`)
+- Returns: `success`, `questions`, `total_questions`, `categories`, `current_category` (`null`).
+
+```json
+{
+  "success": true,
+  "questions": [
+    {
+      "id": 1,
+      "question": "This is a question",
+      "answer": "This is an answer",
+      "category": 2,
+      "difficulty": 1
+    }
+  ],
+  "total_questions": 19,
+  "categories": {
+    "1": "Science",
+    "2": "Art",
+    "3": "Geography",
+    "4": "History",
+    "5": "Entertainment",
+    "6": "Sports"
+  },
+  "current_category": null
+}
+```
+
+---
+
+#### `DELETE '/questions/<int:question_id>'`
+
+- Deletes a question by id.
+- Request Arguments: `question_id` (path param, required)
+- Returns: `success`, `deleted` (id).
+
+```json
+{
+  "success": true,
+  "deleted": 1
+}
+```
+
+---
+
+#### `POST '/questions'`
+
+- Creates a new question.
+- Request Body (JSON): `question` (string, required), `answer` (string, required), `category` (int, required), `difficulty` (int 1-5, required)
+
+```json
+{
+  "question": "Which planet is known as the Red Planet?",
+  "answer": "Mars",
+  "category": 1,
+  "difficulty": 2
+}
+```
+
+- Returns: `success`, `created` (new question id).
+
+```json
+{
+  "success": true,
+  "created": 24
+}
+```
+
+---
+
+#### `POST '/questions/search'`
+
+- Searches for questions that contain the given search term (case-insensitive).
+- Request Body (JSON): `searchTerm` (string, required)
+
+```json
+{ "searchTerm": "Shakespeare" }
+```
+
+- Returns: `success`, `questions`, `total_questions`, `current_category` (`null`).
+
+```json
+{
+  "success": true,
+  "questions": [
+    {
+      "id": 4,
+      "question": "Which Shakespeare play features the question, 'To be or not to be'?",
+      "answer": "Hamlet",
+      "category": 4,
+      "difficulty": 2
+    }
+  ],
+  "total_questions": 1,
+  "current_category": null
+}
+```
+
+---
+
+#### `GET '/categories/<int:category_id>/questions'`
+
+- Fetches questions for a specific category.
+- Request Arguments: `category_id` (path param, required)
+- Returns: `success`, `questions`, `total_questions`, `current_category` (category id).
+
+```json
+{
+  "success": true,
+  "questions": [
+    {
+      "id": 3,
+      "question": "This is a question",
+      "answer": "This is an answer",
+      "category": 1,
+      "difficulty": 2
+    }
+  ],
+  "total_questions": 5,
+  "current_category": 1
+}
+```
+
+---
+
+#### `POST '/quizzes'`
+
+- Fetches a random question for the quiz, filtered by category and excluding previous questions.
+- Request Body (JSON): `previous_questions` (list of int, required), `quiz_category` (string/int, required). Use `"0"` or `0` for all categories.
+
+```json
+{
+  "previous_questions": [5, 9, 12],
+  "quiz_category": "3"
+}
+```
+
+- Returns: `question` (object) or `null` when no more questions are available.
+
+```json
+{
+  "question": {
+    "id": 9,
+    "question": "What is the heaviest organ in the human body?",
+    "answer": "The liver",
+    "category": 1,
+    "difficulty": 4
+  }
+}
+```
+
+```json
+{
+  "question": null
+}
+```
+
+---
+
+### Error Handling
+
+Errors are returned as JSON in the following format:
+
+```json
+{
+  "success": false,
+  "error": 404,
+  "message": "Resource not found"
+}
+```
+
+The API returns the following error types:
+
+- `400` - Bad Request (invalid inputs or missing required fields)
+- `404` - Resource Not Found
+- `422` - Unprocessable Entity (validation or delete errors)
+- `500` - Internal Server Error
 
 ## Testing
 

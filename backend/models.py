@@ -54,51 +54,6 @@ class Question(db.Model):
         }
 
 
-class QuestionValidation:
-    def __init__(self, question, answer, category, difficulty) -> None:
-        try:
-            self.difficulty = self.validate_difficulty(difficulty)
-            self.category = self.validate_category(category)
-            self.question = self.validate_question(question)
-            self.answer = self.validate_answer(answer)
-        except ValueError as e:
-            abort(400, description=str(e.args[0]))
-
-    @staticmethod
-    def validate_difficulty(difficulty: int) -> int:
-        if not isinstance(difficulty, int) or difficulty < 1 or difficulty > 5:
-            raise ValidationError(
-                "difficulty must be an integer between 1 and 5", status_code=422
-            ) from None
-        return difficulty
-
-    @staticmethod
-    def validate_category(category_id: int) -> int:
-        if not isinstance(category_id, int) or category_id < 1:
-            raise ValidationError("category must be a positive integer") from None
-        if not db.session.get(Category, category_id):
-            raise ValidationError(
-                f"Category with id {category_id} does not exist", status_code=422
-            ) from None
-        return category_id
-
-    @staticmethod
-    def validate_answer(answer: str) -> str:
-        if not isinstance(answer, str) or not answer.strip():
-            raise ValidationError(
-                "answer must be a non-empty string", status_code=422
-            ) from None
-        return answer.strip()
-
-    @staticmethod
-    def validate_question(question: str) -> str:
-        if not isinstance(question, str) or not question.strip():
-            raise ValidationError(
-                "question must be a non-empty string", status_code=422
-            ) from None
-        return question.strip()
-
-
 class Category(db.Model):
     __tablename__ = "categories"
 
@@ -138,3 +93,63 @@ class NotFoundError(AppError):
 class ValidationError(AppError):
     status_code = 422
     code = "VALIDATION_ERROR"
+
+
+class QuestionCreationValidation:
+    def __init__(self, question, answer, category, difficulty) -> None:
+        try:
+            self.difficulty = self.validate_difficulty(difficulty)
+            self.category = self.validate_category(category)
+            self.question = self.validate_question(question)
+            self.answer = self.validate_answer(answer)
+        except ValueError as e:
+            abort(400, description=str(e.args[0]))
+
+    @staticmethod
+    def validate_difficulty(difficulty) -> int:
+        try:
+            difficulty = int(difficulty)
+        except (TypeError, ValueError):
+            raise ValidationError(
+                "difficulty must be an integer between 1 and 5", status_code=422
+            ) from None
+        if not isinstance(difficulty, int) or difficulty < 1 or difficulty > 5:
+            raise ValidationError(
+                "difficulty must be an integer between 1 and 5", status_code=422
+            ) from None
+        return difficulty
+
+    @staticmethod
+    def validate_category(category_id: int) -> int:
+        try:
+            category_id = int(category_id)
+        except (TypeError, ValueError):
+            raise ValidationError(
+                "category must be a positive integer", status_code=422
+            ) from None
+            
+        if not isinstance(category_id, int) or category_id < 1:
+            raise ValidationError("category must be a positive integer", status_code=422) from None
+        
+        if not db.session.get(Category, category_id):
+            raise ValidationError(
+                f"Category with id {category_id} does not exist", status_code=422
+            ) from None
+            
+        return category_id
+
+    @staticmethod
+    def validate_answer(answer: str) -> str:
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValidationError(
+                "answer must be a non-empty string", status_code=422
+            ) from None
+        return answer.strip()
+
+    @staticmethod
+    def validate_question(question: str) -> str:
+        if not isinstance(question, str) or not question.strip():
+            raise ValidationError(
+                "question must be a non-empty string", status_code=422
+            ) from None
+        return question.strip()
