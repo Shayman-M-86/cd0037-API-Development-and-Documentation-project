@@ -7,12 +7,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from config import ProductionConfig
 
-production_database_path: str = ProductionConfig(testing=False).SQLALCHEMY_DATABASE_URI
-
 db = SQLAlchemy()
 
 
-def setup_db(app, database_path=production_database_path):
+def setup_db(app, database_path: Optional[str] = None):
+    if database_path is None:
+        database_path = ProductionConfig(testing=False).SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_DATABASE_URI"] = database_path
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db.init_app(app)

@@ -3,6 +3,7 @@ import unittest
 from typing import Optional
 
 from sqlalchemy import text
+from pathlib import Path
 
 from config import AppTestingConfig
 from flaskr import create_app
@@ -14,8 +15,11 @@ logging.basicConfig(level=logging.INFO)
 class TriviaTestCase(unittest.TestCase):
     """This class represents the trivia test case"""
 
+
+    
     def setUp(self):
         """Define test variables and initialize app."""
+        self.API_PREFIX = "/api/v1"
 
         self.database_path: str = AppTestingConfig(testing=True).SQLALCHEMY_DATABASE_URI
 
@@ -31,7 +35,9 @@ class TriviaTestCase(unittest.TestCase):
         with self.app.app_context():
             db.drop_all()
             db.create_all()
-            with open("trivia_test_sqlalchemy.psql", "r", encoding="utf-8") as f:
+            BASE_DIR = Path(__file__).resolve().parent
+            DB_TEST = BASE_DIR / "db" / "test" / "trivia_test_sqlalchemy.psql"
+            with open(DB_TEST, "r", encoding="utf-8") as f:
                 sql = f.read()
             db.session.execute(text(sql))
             db.session.commit()
@@ -42,22 +48,24 @@ class TriviaTestCase(unittest.TestCase):
             Question.query.delete()
             Category.query.delete()
             db.session.commit()
-
+    
+    def api(self, path: str) -> str:
+        return f"{self.API_PREFIX}{path}"
     """
     Write at least one test for each endpoint for successful operation
     and for expected errors.
     """
 
     def test_cors_headers_are_present_on_get(self):
-        res = self.client.get("/categories")
+        res = self.client.get(self.api("/categories"))
         self.assertEqual(res.status_code, 200)
 
         self.assertIn("Access-Control-Allow-Headers", res.headers)
         self.assertIn("Access-Control-Allow-Methods", res.headers)
 
     def test_cors_preflight_options_has_allow_methods(self):
-        res = self.client.options(
-            "/categories",
+        res = self.client.options(self.api(
+            "/categories"),
             headers={
                 "Origin": "http://example.com",
                 "Access-Control-Request-Method": "GET",
@@ -70,7 +78,7 @@ class TriviaTestCase(unittest.TestCase):
 
     def test_get_categories(self):
         with self.app.app_context():
-            res = self.client.get("/categories")
+            res = self.client.get(self.api("/categories"))
             data = res.get_json()
 
             self.assertEqual(res.status_code, 200)
@@ -80,7 +88,7 @@ class TriviaTestCase(unittest.TestCase):
         EXPECTED_KEYS = {"id", "question", "answer", "category", "difficulty"}
         with self.app.app_context():
             for i in range(2):
-                res = self.client.get("/questions", query_string={"page": i + 1})
+                res = self.client.get(self.api("/questions"), query_string={"page": i + 1})
                 data = res.get_json()
 
                 self.assertEqual(res.status_code, 200)
@@ -96,7 +104,7 @@ class TriviaTestCase(unittest.TestCase):
                     self.assertEqual(set(question.keys()), EXPECTED_KEYS)
 
     def test_get_questions_invalid_page(self):
-        res = self.client.get("/questions", query_string={"page": 0})
+        res = self.client.get(self.api("/questions"), query_string={"page": 0})
         data = res.get_json()
 
         self.assertEqual(res.status_code, 400)
@@ -120,7 +128,7 @@ class TriviaTestCase(unittest.TestCase):
 
             question_id = question.id
 
-        res = self.client.delete(f"/questions/{question_id}")
+        res = self.client.delete(self.api(f"/questions/{question_id}"))
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -131,14 +139,14 @@ class TriviaTestCase(unittest.TestCase):
             deleted_question = db.session.get(Question, question_id)
             self.assertIsNone(deleted_question)
 
-        res = self.client.get("/questions")
+        res = self.client.get(self.api("/questions"))
         data = res.get_json()
 
         ids = [q["id"] for q in data["questions"]]
         self.assertNotIn(question_id, ids)
 
     def test_delete_question_not_found(self):
-        res = self.client.delete("/questions/999999")
+        res = self.client.delete(self.api("/questions/999999"))
         data = res.get_json()
 
         self.assertEqual(res.status_code, 404)
@@ -153,7 +161,7 @@ class TriviaTestCase(unittest.TestCase):
             "difficulty": 2,
         }
 
-        res = self.client.post("/questions", json=new_question)
+        res = self.client.post(self.api("/questions"), json=new_question)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -171,7 +179,7 @@ class TriviaTestCase(unittest.TestCase):
             self.assertEqual(question.difficulty, new_question["difficulty"])
 
     def test_questions_post_missing_body(self):
-        res = self.client.post("/questions")
+        res = self.client.post(self.api("/questions"))
         data = res.get_json()
 
         self.assertEqual(res.status_code, 400)
@@ -186,7 +194,7 @@ class TriviaTestCase(unittest.TestCase):
             "difficulty": 10,  # Invalid difficulty
         }
 
-        res = self.client.post("/questions", json=invalid_question)
+        res = self.client.post(self.api("/questions"), json=invalid_question)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 422)
@@ -196,7 +204,7 @@ class TriviaTestCase(unittest.TestCase):
     def test_search_questions_by_term(self):
         payload = {"searchTerm": "title"}
 
-        res = self.client.post("/questions/search", json=payload)
+        res = self.client.post(self.api("/questions/search"), json=payload)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -208,7 +216,7 @@ class TriviaTestCase(unittest.TestCase):
             self.assertIn("title", question["question"].lower())
 
     def test_search_questions_missing_term(self):
-        res = self.client.post("/questions/search", json={})
+        res = self.client.post(self.api("/questions/search"), json={})
         data = res.get_json()
 
         self.assertEqual(res.status_code, 400)
@@ -218,7 +226,7 @@ class TriviaTestCase(unittest.TestCase):
     def test_get_questions_by_category(self):
         category_id = 1
 
-        res = self.client.get(f"/categories/{category_id}/questions")
+        res = self.client.get(self.api(f"/categories/{category_id}/questions"))
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -230,7 +238,7 @@ class TriviaTestCase(unittest.TestCase):
             self.assertEqual(q["category"], category_id)
 
     def test_get_questions_by_category_not_found(self):
-        res = self.client.get("/categories/999999/questions")
+        res = self.client.get(self.api("/categories/999999/questions"))
         data = res.get_json()
 
         self.assertEqual(res.status_code, 404)
@@ -243,7 +251,7 @@ class TriviaTestCase(unittest.TestCase):
             "quiz_category": "0",
         }
 
-        res = self.client.post("/quizzes", json=payload)
+        res = self.client.post(self.api("/quizzes"), json=payload)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -258,7 +266,7 @@ class TriviaTestCase(unittest.TestCase):
         self.assertIn("category", q)
 
     def test_quizzes_invalid_payload(self):
-        res = self.client.post("/quizzes", json={"previous_questions": "bad"})
+        res = self.client.post(self.api("/quizzes"), json={"previous_questions": "bad"})
         data = res.get_json()
 
         self.assertEqual(res.status_code, 400)
@@ -269,7 +277,7 @@ class TriviaTestCase(unittest.TestCase):
         previous = [1, 4, 20, 15]
         payload = {"previous_questions": previous, "quiz_category": "0"}
 
-        res = self.client.post("/quizzes", json=payload)
+        res = self.client.post(self.api("/quizzes"), json=payload)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -281,7 +289,7 @@ class TriviaTestCase(unittest.TestCase):
 
         payload = {"previous_questions": [], "quiz_category": category_id}
 
-        res = self.client.post("/quizzes", json=payload)
+        res = self.client.post(self.api("/quizzes"), json=payload)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -311,7 +319,7 @@ class TriviaTestCase(unittest.TestCase):
             "difficulty": 3,
         }
 
-        res = self.client.put(f"/questions/{question_id}", json=payload)
+        res = self.client.put(self.api(f"/questions/{question_id}"), json=payload)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 200)
@@ -347,7 +355,7 @@ class TriviaTestCase(unittest.TestCase):
             question_id = question.id
 
         payload = {"difficulty": 999}
-        res = self.client.put(f"/questions/{question_id}", json=payload)
+        res = self.client.put(self.api(f"/questions/{question_id}"), json=payload)
         data = res.get_json()
 
         self.assertEqual(res.status_code, 422)
@@ -355,7 +363,7 @@ class TriviaTestCase(unittest.TestCase):
         self.assertIn("difficulty must be an integer between 1 and 5", data["message"])
 
     def test_update_question_put_missing_body(self):
-        res = self.client.put("/questions/1")
+        res = self.client.put(self.api("/questions/1"))
         data = res.get_json()
 
         self.assertEqual(res.status_code, 400)
@@ -363,7 +371,7 @@ class TriviaTestCase(unittest.TestCase):
         self.assertIn("valid JSON body", data["message"])
 
     def test_update_question_put_not_found(self):
-        res = self.client.put("/questions/999999", json={"question": "Nope"})
+        res = self.client.put(self.api("/questions/999999"), json={"question": "Nope"})
         data = res.get_json()
 
         self.assertEqual(res.status_code, 404)

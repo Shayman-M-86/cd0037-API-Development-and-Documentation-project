@@ -1,0 +1,31 @@
+name: trivia
+services:
+  trivia_db:
+    image: postgres:16
+    container_name: postgres_trivia
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data_trivia:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
+  
+  trivia_db_test:
+    image: postgres:16
+    container_name: postgres_trivia_test
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${TEST_POSTGRES_DB}
+    volumes:
+      - postgres_data_trivia_test:/var/lib/postgresql/data
+      - ./db/test/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5434:5432"
+
+volumes:
+  postgres_data_trivia:
+  postgres_data_trivia_test:

@@ -1,7 +1,7 @@
 import random
 from typing import Optional, cast
 
-from flask import Flask, Request, Response, abort, jsonify, request
+from flask import Flask, Request, Response, abort, jsonify, request, Blueprint
 from flask.typing import ResponseReturnValue
 from flask_cors import CORS
 from sqlalchemy.exc import SQLAlchemyError
@@ -19,7 +19,7 @@ from models import (
 QUESTIONS_PER_PAGE = 10
 
 
-def create_app(test_config=None):
+def create_app(test_config: Optional[dict] = None):
     app = Flask(__name__)
 
     if test_config is None:
@@ -33,6 +33,8 @@ def create_app(test_config=None):
 
     with app.app_context():
         db.create_all()
+    
+    api = Blueprint("api", __name__, url_prefix="/api/v1")
 
     """
     Helpers
@@ -62,7 +64,7 @@ def create_app(test_config=None):
             abort(400, description="question_id must be a positive integer")
         return question_id
 
-    @app.after_request
+    @api.after_request
     def after_request(response: Response) -> Response:
         response.headers.add(
             "Access-Control-Allow-Headers", "Content-Type,Authorization,true"
@@ -77,7 +79,7 @@ def create_app(test_config=None):
     for all available categories.
     """
 
-    @app.route("/categories", methods=["GET"])
+    @api.route("/categories", methods=["GET"])
     def get_categories():
         try:
             categories: list[Category] = (
@@ -102,7 +104,7 @@ def create_app(test_config=None):
     Clicking on the page numbers should update the questions.
     """
 
-    @app.route("/questions", methods=["GET"])
+    @api.route("/questions", methods=["GET"])
     def get_questions():
         page, page_size, offset = get_pagination(request, QUESTIONS_PER_PAGE)
 
@@ -146,7 +148,7 @@ def create_app(test_config=None):
     This removal will persist in the database and when you refresh the page.
     """
 
-    @app.route("/questions/<int:question_id>", methods=["DELETE"])
+    @api.route("/questions/<int:question_id>", methods=["DELETE"])
     def delete_question(question_id: int):
         qid: int = validate_question_id(question_id)
 
@@ -172,7 +174,7 @@ def create_app(test_config=None):
     of the questions list in the "List" tab.
     """
 
-    @app.route("/questions", methods=["POST"])
+    @api.route("/questions", methods=["POST"])
     def add_question():
         body = request.get_json(silent=True)
         if body is None:
@@ -213,7 +215,7 @@ def create_app(test_config=None):
     Try using the word "title" to start.
     """
 
-    @app.route("/questions/search", methods=["POST"])
+    @api.route("/questions/search", methods=["POST"])
     def search_questions():
         body = request.get_json(silent=True)
         if body is None:
@@ -256,7 +258,7 @@ def create_app(test_config=None):
     category to be shown.
     """
 
-    @app.route("/categories/<int:category_id>/questions", methods=["GET"])
+    @api.route("/categories/<int:category_id>/questions", methods=["GET"])
     def get_questions_by_category(category_id: int):
         cid = validate_category_id(category_id)
 
@@ -295,7 +297,7 @@ def create_app(test_config=None):
     and shown whether they were correct or not.
     """
 
-    @app.route("/quizzes", methods=["POST"])
+    @api.route("/quizzes", methods=["POST"])
     def play_quiz():
         body = request.get_json(silent=True)
         if body is None:
@@ -354,7 +356,7 @@ def create_app(test_config=None):
     Create a PUT endpoint to update a question.
     """
 
-    @app.route("/questions/<int:question_id>", methods=["PUT"])
+    @api.route("/questions/<int:question_id>", methods=["PUT"])
     def update_question(question_id: int):
         qid = validate_question_id(question_id)
         body = request.get_json(silent=True)
@@ -405,7 +407,7 @@ def create_app(test_config=None):
     Global Error Handler 
     """
 
-    @app.errorhandler(HTTPException)
+    @api.errorhandler(HTTPException)
     def handle_http_exception(err: HTTPException) -> ResponseReturnValue:
         status_code = cast(int, err.code or 500)
 
@@ -420,7 +422,7 @@ def create_app(test_config=None):
             status_code,
         )
 
-    @app.errorhandler(Exception)
+    @api.errorhandler(Exception)
     def handle_unexpected_exception(_err: Exception):
         return jsonify(
             {
@@ -430,4 +432,5 @@ def create_app(test_config=None):
             }
         ), 500
 
+    app.register_blueprint(api)
     return app

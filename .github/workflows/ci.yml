@@ -1,0 +1,58 @@
+name: Backend tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:test_password@localhost:5434/trivia_test
+      TEST_SECRET_KEY: supersecretkeytest
+      TEST_POSTGRES_DB: trivia_test
+      TEST_POSTGRES_USER: postgres
+      TEST_POSTGRES_PASSWORD: test_password
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ${{ env.TEST_POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.TEST_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.TEST_POSTGRES_PASSWORD }}
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d trivia_test"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install deps
+        working-directory: backend
+        run: |
+          uv venv -p 3.9
+          uv pip sync 
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          TEST_SECRET_KEY: ${{ env.TEST_SECRET_KEY }}
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: |
+          uv run pytest -q
