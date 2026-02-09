@@ -182,7 +182,7 @@ class TriviaTestCase(unittest.TestCase):
         res = self.client.post(self.api("/questions"))
         data = res.get_json()
 
-        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.status_code, 400)
         self.assertFalse(data["success"])
         self.assertIn("valid JSON body", data["message"])
 
