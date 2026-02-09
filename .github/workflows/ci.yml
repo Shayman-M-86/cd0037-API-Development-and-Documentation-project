@@ -13,7 +13,7 @@ jobs:
       TEST_SECRET_KEY: supersecretkeytest
       TEST_POSTGRES_DB: trivia_test
       TEST_POSTGRES_USER: postgres
-      TEST_POSTGRES_PASSWORD: test_password
+      TEST_POSTGRES_PASSWORD: ${{ secrets.TEST_POSTGRES_PASSWORD }}
 
     services:
       postgres:
