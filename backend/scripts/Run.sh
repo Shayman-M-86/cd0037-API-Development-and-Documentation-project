@@ -1,5 +1,5 @@
-
-
+#!/usr/bin/env bash
+# This script is used to run the Flask app in development mode in a local environment.
 echo "Running Flask app"
 export FLASK_APP=flaskr
 export FLASK_ENV=development

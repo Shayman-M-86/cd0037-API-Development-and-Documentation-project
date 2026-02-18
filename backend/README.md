@@ -1,5 +1,7 @@
 # Backend - Trivia API
 
+This project implements a RESTful API for a Trivia application using Flask and SQLAlchemy. The API supports retrieving questions, creating new questions, deleting questions, searching for questions, and running quizzes. It is designed to integrate with a React frontend and includes comprehensive testing.
+
 ## Requirements
 
 - Python 3.9.25

@@ -7,7 +7,7 @@ from flask_cors import CORS
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
-from models import (
+from .models import (
     Category,
     Question,
     QuestionCreationValidation,

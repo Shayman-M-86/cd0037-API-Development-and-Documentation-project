@@ -27,6 +27,13 @@ dependencies = [
 
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+pythonpath = ["."]
+addopts = "-ra -q"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s | %(levelname)s | - %(message)s"

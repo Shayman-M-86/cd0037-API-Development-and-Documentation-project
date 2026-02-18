@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# This script is used to run the Flask app in development mode in a local environment.
 set -euo pipefail
 
 cleanup() {
@@ -31,10 +32,6 @@ do
   sleep 1
 done
 
-# If pg_isready returns too early for you, use a small loop:
-# until docker compose exec -T trivia_db pg_isready -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-trivia}" >/dev/null; do
-#   sleep 1
-# done
 
 echo "Running Flask..."
 export FLASK_APP=flaskr

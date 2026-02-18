@@ -6,9 +6,9 @@ from typing import Optional
 
 from sqlalchemy import text
 
-from config import AppTestingConfig
 from flaskr import create_app
-from models import Category, Question, db
+from flaskr.config import AppTestingConfig
+from flaskr.models import Category, Question, db
 
 log = logging.getLogger("tests.compose")
 
@@ -61,8 +61,11 @@ class TriviaTestCase(unittest.TestCase):
         with self.app.app_context():
             db.drop_all()
             db.create_all()
-            BASE_DIR = Path(__file__).resolve().parent
+            BASE_DIR = Path(__file__).resolve().parents[1]
             DB_TEST = BASE_DIR / "db" / "test" / "trivia_test_sqlalchemy.psql"
+            if not DB_TEST.exists():
+                raise FileNotFoundError(f"Seed SQL not found: {DB_TEST}")
+            
             with open(DB_TEST, "r", encoding="utf-8") as f:
                 sql = f.read()
             db.session.execute(text(sql))
