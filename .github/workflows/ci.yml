@@ -15,20 +15,20 @@ jobs:
       TEST_POSTGRES_USER: postgres
       TEST_POSTGRES_PASSWORD: ${{ secrets.TEST_POSTGRES_PASSWORD }}
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: ${{ env.TEST_POSTGRES_DB }}
-          POSTGRES_USER: ${{ env.TEST_POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.TEST_POSTGRES_PASSWORD }}
-        ports:
-          - 5434:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d trivia_test"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-retries=20
+    # services:
+    #   postgres:
+    #     image: postgres:16
+    #     env:
+    #       POSTGRES_DB: ${{ env.TEST_POSTGRES_DB }}
+    #       POSTGRES_USER: ${{ env.TEST_POSTGRES_USER }}
+    #       POSTGRES_PASSWORD: ${{ env.TEST_POSTGRES_PASSWORD }}
+    #     ports:
+    #       - 5434:5432
+    #     options: >-
+    #       --health-cmd="pg_isready -U postgres -d trivia_test"
+    #       --health-interval=5s
+    #       --health-timeout=3s
+    #       --health-retries=20
 
     steps:
       - uses: actions/checkout@v4
