@@ -1,22 +1,48 @@
 import logging
 import unittest
+import subprocess
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import text
-from pathlib import Path
 
 from config import AppTestingConfig
 from flaskr import create_app
 from models import Category, Question, db
 
-logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("tests.compose")
+
+
+
+COMPOSE = ["docker", "compose", "-f", "docker-compose.test.yml"]
+
+
+def compose(args: list[str]) -> None:
+    p = subprocess.run(
+        COMPOSE + args,
+        text=True,
+        capture_output=True,
+    )
+    if p.stdout:
+        for line in p.stdout.splitlines():
+            log.info("[compose]:%s", line)
+    if p.stderr:
+        for line in p.stderr.splitlines():
+            log.warning("[compose]:%s", line)
+    p.check_returncode()
 
 
 class TriviaTestCase(unittest.TestCase):
     """This class represents the trivia test case"""
 
+    @classmethod
+    def setUpClass(cls):
+        compose(["up", "-d", "--wait", "--wait-timeout", "120"])
 
-    
+    @classmethod
+    def tearDownClass(cls):
+        compose(["down", "--volumes", "--remove-orphans"])
+
     def setUp(self):
         """Define test variables and initialize app."""
         self.API_PREFIX = "/api/v1"
@@ -48,13 +74,9 @@ class TriviaTestCase(unittest.TestCase):
             Question.query.delete()
             Category.query.delete()
             db.session.commit()
-    
+
     def api(self, path: str) -> str:
         return f"{self.API_PREFIX}{path}"
-    """
-    Write at least one test for each endpoint for successful operation
-    and for expected errors.
-    """
 
     def test_cors_headers_are_present_on_get(self):
         res = self.client.get(self.api("/categories"))
@@ -64,8 +86,8 @@ class TriviaTestCase(unittest.TestCase):
         self.assertIn("Access-Control-Allow-Methods", res.headers)
 
     def test_cors_preflight_options_has_allow_methods(self):
-        res = self.client.options(self.api(
-            "/categories"),
+        res = self.client.options(
+            self.api("/categories"),
             headers={
                 "Origin": "http://example.com",
                 "Access-Control-Request-Method": "GET",
@@ -88,7 +110,9 @@ class TriviaTestCase(unittest.TestCase):
         EXPECTED_KEYS = {"id", "question", "answer", "category", "difficulty"}
         with self.app.app_context():
             for i in range(2):
-                res = self.client.get(self.api("/questions"), query_string={"page": i + 1})
+                res = self.client.get(
+                    self.api("/questions"), query_string={"page": i + 1}
+                )
                 data = res.get_json()
 
                 self.assertEqual(res.status_code, 200)
