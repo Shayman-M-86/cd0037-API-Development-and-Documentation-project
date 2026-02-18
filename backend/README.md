@@ -2,6 +2,15 @@
 
 This project implements a RESTful API for a Trivia application using Flask and SQLAlchemy. The API supports retrieving questions, creating new questions, deleting questions, searching for questions, and running quizzes. It is designed to integrate with a React frontend and includes comprehensive testing.
 
+## My Contributions
+
+- Implemented all API endpoints with proper request handling and response formatting.
+- Set up database models and migrations using SQLAlchemy.
+- Implemented error handling for various scenarios (400, 404, 422, 500).
+- Wrote unit tests for each endpoint covering both success and error cases.
+- Documented the API endpoints and provided instructions for setting up the environment and running the server.
+- Implemented automation pipelines such as GitHub Actions on commit to run tests.
+
 ## Requirements
 
 - Python 3.9.25
